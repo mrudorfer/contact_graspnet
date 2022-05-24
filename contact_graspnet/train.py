@@ -36,7 +36,7 @@ def train(global_config, log_dir):
         log_dir {str} -- Checkpoint directory
     """
 
-    contact_infos = load_scene_contacts(global_config['DATA']['data_path'], split='train')
+    contact_infos = load_scene_contacts(global_config['DATA']['data_path'], split='train', max_num_grasps=5000)
     
     num_train_samples = len(contact_infos)
     print('using %s meshes' % num_train_samples)
@@ -105,22 +105,26 @@ def train_one_epoch(sess, ops, summary_ops, file_writers, pcreader):
     log_string(str(datetime.now()))
     loss_log = np.zeros((10,7))
     get_time = time.time()
-    
-    for batch_idx in range(len(pcreader.shapes)):
 
+    num_batches = len(pcreader.shapes)
+    for batch_idx in range(num_batches):
+        print(f'batch {batch_idx}/{num_batches}')
         batch_data, cam_poses, scene_idx = pcreader.get_scene_batch(scene_idx=batch_idx)
-        
+
         # OpenCV OpenGL conversion
         cam_poses, batch_data = center_pc_convert_cam(cam_poses, batch_data)
-        
+        print('data loaded')
+
         feed_dict = {ops['pointclouds_pl']: batch_data, ops['cam_poses_pl']: cam_poses,
                      ops['scene_idx_pl']: scene_idx, ops['is_training_pl']: True}
+        print('starting session')
 
         step, summary, _, loss_val, dir_loss, bin_ce_loss, \
         offset_loss, approach_loss, adds_loss, adds_gt2pred_loss, scene_idx = sess.run([ops['step'], summary_ops['merged'], ops['train_op'], ops['loss'], ops['dir_loss'], 
                                                                                         ops['bin_ce_loss'], ops['offset_loss'], ops['approach_loss'], ops['adds_loss'], 
                                                                                         ops['adds_gt2pred_loss'], ops['scene_idx']], feed_dict=feed_dict)
-        assert scene_idx[0] == scene_idx     
+        print('session ran')
+        assert scene_idx[0] == scene_idx
         
         loss_log[batch_idx%10,:] = loss_val, dir_loss, bin_ce_loss, offset_loss, approach_loss, adds_loss, adds_gt2pred_loss
         

@@ -8,7 +8,7 @@ import numpy as np
 import trimesh.transformations as tra
 
 
-def load_scene_contacts(dataset_folder, split='train'):
+def load_scene_contacts(dataset_folder, split='train', max_num_grasps=5000):
     """
     Load contact grasp annotations from acronym scenes
 
@@ -17,6 +17,7 @@ def load_scene_contacts(dataset_folder, split='train'):
 
     Keyword Arguments:
         split {str} -- 'train' or 'test'
+        max_num_grasps {int} -- maximum number of grasp annotations to load
 
     Returns:
         list(dicts) -- list of scene annotations dicts with object paths and transforms and grasp contacts and transforms.
@@ -51,9 +52,11 @@ def load_scene_contacts(dataset_folder, split='train'):
         grasp_centers = grasp_centers[sim_result]
         quaternions = quaternions[sim_result]
 
-        # print('contact points', contact_points.shape)
-        # print('centers', grasp_centers.shape)
-        # print('quats', quaternions.shape)  # wxyz
+        if grasp_centers.shape[0] > max_num_grasps:
+            idcs = np.random.choice(grasp_centers.shape[0], max_num_grasps, replace=False)
+            contact_points = contact_points[idcs]
+            grasp_centers = grasp_centers[idcs]
+            quaternions = quaternions[idcs]
 
         grasps = matrix_from_pos_quat(grasp_centers, quaternions)
         grasps = transform_grasps_TCP_to_hand(grasps)
