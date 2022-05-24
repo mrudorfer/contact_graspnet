@@ -39,9 +39,7 @@ def train(global_config, log_dir):
     contact_infos = load_scene_contacts(global_config['DATA']['data_path'], split='train')
     
     num_train_samples = len(contact_infos)
-    num_test_samples = 0
-        
-    print('using %s meshes' % (num_train_samples + num_test_samples))
+    print('using %s meshes' % num_train_samples)
 
     pcreader = PointCloudReader(
         dataset_folder=global_config['DATA']['data_path'],
@@ -92,11 +90,11 @@ def train(global_config, log_dir):
         step = train_one_epoch(sess, ops, summary_ops, file_writers, pcreader)
         log_string('trained epoch {} in: {}'.format(epoch, time.time()-epoch_time))
 
-        # Save the variables to disk.
-        save_path = saver.save(sess, os.path.join(log_dir, "model.ckpt"), global_step=step, write_meta_graph=False)
-        log_string("Model saved in file: %s" % save_path)
+        if epoch % 10 == 0:
+            # Save the variables to disk.
+            save_path = saver.save(sess, os.path.join(log_dir, "model.ckpt"), global_step=step, write_meta_graph=False)
+            log_string("Model saved in file: %s" % save_path)
 
-        if num_test_samples > 0:
             eval_time = time.time()
             eval_validation_scenes(sess, ops, summary_ops, file_writers, pcreader)
             log_string('evaluation time: {}'.format(time.time()-eval_time))
