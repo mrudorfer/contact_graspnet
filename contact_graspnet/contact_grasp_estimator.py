@@ -34,8 +34,9 @@ class GraspEstimator:
             self._contact_grasp_cfg = cfg
 
         self._model_func = importlib.import_module(self._contact_grasp_cfg['MODEL']['model'])
-        self._num_input_points = self._contact_grasp_cfg['DATA']['raw_num_points'] if 'raw_num_points' in self._contact_grasp_cfg['DATA'] else self._contact_grasp_cfg['DATA']['num_point']
-        
+        # self._num_input_points = self._contact_grasp_cfg['DATA']['raw_num_points'] if 'raw_num_points' in self._contact_grasp_cfg['DATA'] else self._contact_grasp_cfg['DATA']['num_point']
+        self._num_input_points = None  # allow flexible size of point clouds (requires batch size 1)
+
         self.placeholders = self._model_func.placeholder_inputs(self._contact_grasp_cfg['OPTIMIZER']['batch_size'],
                                                                 self._num_input_points, 
                                                                 self._contact_grasp_cfg['DATA']['input_normals'])
