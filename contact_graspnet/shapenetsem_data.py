@@ -8,7 +8,7 @@ import numpy as np
 import trimesh.transformations as tra
 
 
-def load_scene_contacts(dataset_folder, split='train', max_num_grasps=5000):
+def load_scene_contacts(dataset_folder, split='train', max_num_grasps=None):
     """
     Load contact grasp annotations from acronym scenes
 
@@ -52,7 +52,7 @@ def load_scene_contacts(dataset_folder, split='train', max_num_grasps=5000):
         grasp_centers = grasp_centers[sim_result]
         quaternions = quaternions[sim_result]
 
-        if grasp_centers.shape[0] > max_num_grasps:
+        if max_num_grasps is not None and grasp_centers.shape[0] > max_num_grasps:
             idcs = np.random.choice(grasp_centers.shape[0], max_num_grasps, replace=False)
             contact_points = contact_points[idcs]
             grasp_centers = grasp_centers[idcs]

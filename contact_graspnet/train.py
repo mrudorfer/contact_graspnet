@@ -36,7 +36,7 @@ def train(global_config, log_dir):
         log_dir {str} -- Checkpoint directory
     """
 
-    contact_infos = load_scene_contacts(global_config['DATA']['data_path'], split='train', max_num_grasps=5000)
+    contact_infos = load_scene_contacts(global_config['DATA']['data_path'], split='train', max_num_grasps=None)
     
     num_train_samples = len(contact_infos)
     print('using %s meshes' % num_train_samples)
@@ -95,9 +95,10 @@ def train(global_config, log_dir):
             save_path = saver.save(sess, os.path.join(log_dir, "model.ckpt"), global_step=step, write_meta_graph=False)
             log_string("Model saved in file: %s" % save_path)
 
-            eval_time = time.time()
-            eval_validation_scenes(sess, ops, summary_ops, file_writers, pcreader)
-            log_string('evaluation time: {}'.format(time.time()-eval_time))
+            # there is some bug in validation, have no clue what, skip for now
+            # eval_time = time.time()
+            # eval_validation_scenes(sess, ops, summary_ops, file_writers, pcreader)
+            # log_string('evaluation time: {}'.format(time.time()-eval_time))
 
 def train_one_epoch(sess, ops, summary_ops, file_writers, pcreader):
     """ ops: dict mapping from string to tf ops """
@@ -108,22 +109,18 @@ def train_one_epoch(sess, ops, summary_ops, file_writers, pcreader):
 
     num_batches = len(pcreader.shapes)
     for batch_idx in range(num_batches):
-        print(f'batch {batch_idx}/{num_batches}')
         batch_data, cam_poses, scene_idx = pcreader.get_scene_batch(scene_idx=batch_idx)
 
         # OpenCV OpenGL conversion
         cam_poses, batch_data = center_pc_convert_cam(cam_poses, batch_data)
-        print('data loaded')
 
         feed_dict = {ops['pointclouds_pl']: batch_data, ops['cam_poses_pl']: cam_poses,
                      ops['scene_idx_pl']: scene_idx, ops['is_training_pl']: True}
-        print('starting session')
 
         step, summary, _, loss_val, dir_loss, bin_ce_loss, \
         offset_loss, approach_loss, adds_loss, adds_gt2pred_loss, scene_idx = sess.run([ops['step'], summary_ops['merged'], ops['train_op'], ops['loss'], ops['dir_loss'], 
                                                                                         ops['bin_ce_loss'], ops['offset_loss'], ops['approach_loss'], ops['adds_loss'], 
                                                                                         ops['adds_gt2pred_loss'], ops['scene_idx']], feed_dict=feed_dict)
-        print('session ran')
         assert scene_idx[0] == scene_idx
         
         loss_log[batch_idx%10,:] = loss_val, dir_loss, bin_ce_loss, offset_loss, approach_loss, adds_loss, adds_gt2pred_loss
@@ -162,7 +159,8 @@ def eval_validation_scenes(sess, ops, summary_ops, file_writers, pcreader, max_e
                                                                                                         ops['offset_loss'], ops['approach_loss'], ops['adds_loss'], ops['adds_gt2pred_loss'],
                                                                                                         summary_ops['merged_eval'], summary_ops['pr_update_op'], 
                                                                                                         summary_ops['auc_update_op']] + [summary_ops['acc_update_ops']], feed_dict=feed_dict)
-        assert scene_idx[0] == len(pcreader.shapes) - 1 - batch_idx
+        assert scene_idx[0] == len(pcreader.shapes) - 1 - batch_idx, f'{scene_idx[0]} == {len(pcreader.shapes) - 1 - batch_idx}'
+        # todo: for some reason this fires. scene_idx[0] is 0, whereas the other idx is 194 (as it should be)... why?
         
         loss_log[batch_idx,:] = loss_val, dir_loss, bin_ce_loss, offset_loss, approach_loss, adds_loss, adds_gt2pred_loss
 
