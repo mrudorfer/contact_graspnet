@@ -183,7 +183,8 @@ if __name__ == "__main__":
         if not os.path.exists(os.path.dirname(ckpt_dir)):
             ckpt_dir = os.path.join(BASE_DIR, ckpt_dir)
         os.makedirs(ckpt_dir, exist_ok=True)
-    
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.system('cp {} {}'.format(os.path.join(CONTACT_DIR, 'contact_graspnet.py'), ckpt_dir)) # bkp of model def
     os.system('cp {} {}'.format(os.path.join(CONTACT_DIR, 'train.py'), ckpt_dir)) # bkp of train procedure
