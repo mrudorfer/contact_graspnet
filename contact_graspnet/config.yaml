@@ -1,6 +1,6 @@
 DATA:
   scene_contacts_path: scene_contacts
-  gripper_width: 0.08
+  gripper_width: 0.085
   input_normals: false
   use_uniform_quaternions: False
   view_sphere:
