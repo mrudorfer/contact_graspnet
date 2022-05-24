@@ -22,7 +22,7 @@ physical_devices = tf.config.experimental.list_physical_devices('GPU')
 tf.config.experimental.set_memory_growth(physical_devices[0], True)
     
 import config_utils
-from data import PointCloudReader, load_scene_contacts, center_pc_convert_cam
+from shapenetsem_data import PointCloudReader, load_scene_contacts, center_pc_convert_cam
 from summaries import build_summary_ops, build_file_writers
 from tf_train_ops import load_labels_and_losses, build_train_op
 from contact_grasp_estimator import GraspEstimator
@@ -36,35 +36,18 @@ def train(global_config, log_dir):
         log_dir {str} -- Checkpoint directory
     """
 
-    contact_infos = load_scene_contacts(global_config['DATA']['data_path'],
-                                        scene_contacts_path=global_config['DATA']['scene_contacts_path'])
+    contact_infos = load_scene_contacts(global_config['DATA']['data_path'], split='train')
     
-    num_train_samples = len(contact_infos)-global_config['DATA']['num_test_scenes']
-    num_test_samples = global_config['DATA']['num_test_scenes']
+    num_train_samples = len(contact_infos)
+    num_test_samples = 0
         
     print('using %s meshes' % (num_train_samples + num_test_samples))
-    if 'train_and_test' in global_config['DATA'] and global_config['DATA']['train_and_test']:
-        num_train_samples = num_train_samples + num_test_samples
-        num_test_samples = 0
-        print('using train and test data')
 
     pcreader = PointCloudReader(
-        root_folder=global_config['DATA']['data_path'],
+        dataset_folder=global_config['DATA']['data_path'],
         batch_size=global_config['OPTIMIZER']['batch_size'],
-        estimate_normals=global_config['DATA']['input_normals'],
-        raw_num_points=global_config['DATA']['raw_num_points'],
-        use_uniform_quaternions = global_config['DATA']['use_uniform_quaternions'],
-        scene_obj_scales = [c['obj_scales'] for c in contact_infos],
-        scene_obj_paths = [c['obj_paths'] for c in contact_infos],
-        scene_obj_transforms = [c['obj_transforms'] for c in contact_infos],
-        num_train_samples = num_train_samples,
-        num_test_samples = num_test_samples,
-        use_farthest_point = global_config['DATA']['use_farthest_point'],
-        intrinsics=global_config['DATA']['intrinsics'],
-        elevation=global_config['DATA']['view_sphere']['elevation'],
-        distance_range=global_config['DATA']['view_sphere']['distance_range'],
-        pc_augm_config=global_config['DATA']['pc_augm'],
-        depth_augm_config=global_config['DATA']['depth_augm']
+        split='train',
+        max_points=global_config['DATA']['raw_num_points']
     )
 
     with tf.Graph().as_default():
@@ -81,7 +64,7 @@ def train(global_config, log_dir):
         ops['train_op'] = build_train_op(ops['loss'], ops['step'], global_config)
 
         # Add ops to save and restore all the variables.
-        saver = tf.train.Saver(save_relative_paths=True, keep_checkpoint_every_n_hours=4)
+        saver = tf.train.Saver(save_relative_paths=True, keep_checkpoint_every_n_hours=1)
 
         # Create a session
         config = tf.ConfigProto()
@@ -125,7 +108,7 @@ def train_one_epoch(sess, ops, summary_ops, file_writers, pcreader):
     loss_log = np.zeros((10,7))
     get_time = time.time()
     
-    for batch_idx in range(pcreader._num_train_samples):
+    for batch_idx in range(len(pcreader.shapes)):
 
         batch_data, cam_poses, scene_idx = pcreader.get_scene_batch(scene_idx=batch_idx)
         
@@ -153,16 +136,19 @@ def train_one_epoch(sess, ops, summary_ops, file_writers, pcreader):
 
 def eval_validation_scenes(sess, ops, summary_ops, file_writers, pcreader, max_eval_objects=500):
     """ ops: dict mapping from string to tf ops """
+    """ simple validation: using last 20 training samples for evaluation, only view 0 """
+    n_test_samples = 20
+
     is_training = False
     log_string(str(datetime.now()))
-    loss_log = np.zeros((min(pcreader._num_test_samples, max_eval_objects),7))
+    loss_log = np.zeros((min(n_test_samples, max_eval_objects), 7))
 
     # resets accumulation of pr and auc data
     sess.run(summary_ops['pr_reset_op'])
     
-    for batch_idx in np.arange(min(pcreader._num_test_samples, max_eval_objects)):
-
-        batch_data, cam_poses, scene_idx = pcreader.get_scene_batch(scene_idx=pcreader._num_train_samples + batch_idx)
+    for batch_idx in np.arange(min(n_test_samples, max_eval_objects)):
+        scene_idx = len(pcreader.shapes) - 1 - batch_idx
+        batch_data, cam_poses, scene_idx = pcreader.get_scene_batch(scene_idx=scene_idx, view=0)
 
         # OpenCV OpenGL conversion
         cam_poses, batch_data = center_pc_convert_cam(cam_poses, batch_data)
@@ -174,7 +160,7 @@ def eval_validation_scenes(sess, ops, summary_ops, file_writers, pcreader, max_e
                                                                                                         ops['offset_loss'], ops['approach_loss'], ops['adds_loss'], ops['adds_gt2pred_loss'],
                                                                                                         summary_ops['merged_eval'], summary_ops['pr_update_op'], 
                                                                                                         summary_ops['auc_update_op']] + [summary_ops['acc_update_ops']], feed_dict=feed_dict)
-        assert scene_idx[0] == (pcreader._num_train_samples + batch_idx)
+        assert scene_idx[0] == len(pcreader.shapes) - 1 - batch_idx
         
         loss_log[batch_idx,:] = loss_val, dir_loss, bin_ce_loss, offset_loss, approach_loss, adds_loss, adds_gt2pred_loss
 
