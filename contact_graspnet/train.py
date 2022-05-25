@@ -45,7 +45,7 @@ def train(global_config, log_dir):
         dataset_folder=global_config['DATA']['data_path'],
         batch_size=global_config['OPTIMIZER']['batch_size'],
         split='train',
-        max_points=global_config['DATA']['raw_num_points']
+        n_points=global_config['DATA']['raw_num_points']
     )
 
     with tf.Graph().as_default():

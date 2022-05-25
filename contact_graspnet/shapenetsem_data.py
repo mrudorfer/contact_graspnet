@@ -7,6 +7,8 @@ import cv2
 import numpy as np
 import trimesh.transformations as tra
 
+from .data import regularize_pc_point_count
+
 
 def load_scene_contacts(dataset_folder, split='train', max_num_grasps=None):
     """
@@ -156,7 +158,7 @@ class PointCloudReader:
         batch_size {int} -- number of rendered point clouds per-batch (1)
         split {str} -- 'train' or 'test'
     """
-    def __init__(self, dataset_folder, batch_size=1, split='train', max_points=20000):
+    def __init__(self, dataset_folder, batch_size=1, split='train', n_points=None):
         assert split == 'test' or split == 'train', f'unknown split {split}'
         assert batch_size == 1
 
@@ -167,7 +169,7 @@ class PointCloudReader:
         self.shapes = shapes
         self.batch_size = batch_size
         self.split = split
-        self.max_points = 20000
+        self.n_points = n_points
         self.images_dir = os.path.join(dataset_folder, 'images')
 
     def get_scene_batch(self, scene_idx=None, return_segmap=False, save=False, view=None):
@@ -198,9 +200,11 @@ class PointCloudReader:
             camera_pose = cam_info['view%d' % view]
 
         pc = self.get_point_cloud_from_cam_info(shape, camera_pose, view)
-        if pc.shape[0] > self.max_points:
-            idcs = np.random.choice(pc.shape[0], self.max_points, replace=False)
-            pc = pc[idcs]
+        if self.n_points is not None:
+            pc = regularize_pc_point_count(pc, self.n_points)
+        # if pc.shape[0] > self.max_points:
+        #     idcs = np.random.choice(pc.shape[0], self.max_points, replace=False)
+        #     pc = pc[idcs]
 
         # pc = self.prune_and_normalize(pc)  # perhaps don't mess with the scale, as this might be done in CGN?
         # also we are in cam coordinates now, so the pruning and normalisation might not be meaningful

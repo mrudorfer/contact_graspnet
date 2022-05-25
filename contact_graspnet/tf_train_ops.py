@@ -118,7 +118,6 @@ def load_labels_and_losses(grasp_estimator, contact_infos, global_config, train=
     dir_loss, bin_ce_loss, offset_loss, approach_loss, adds_loss, adds_loss_gt2pred = grasp_estimator._model_func.get_losses(target_point_cloud, end_points, dir_labels_pc_cam, 
                                                                                                                              offset_labels_pc, grasp_suc_labels_pc, approach_labels_pc, 
                                                                                                                              global_config)
-    print('unweighted losses: ', dir_loss, bin_ce_loss, offset_loss, approach_loss, adds_loss, adds_loss_gt2pred)
 
     total_loss = 0
     if global_config['MODEL']['pred_contact_base']:
