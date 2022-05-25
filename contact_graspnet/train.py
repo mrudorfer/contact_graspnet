@@ -118,7 +118,7 @@ def train_one_epoch(sess, ops, summary_ops, file_writers, pcreader):
                      ops['scene_idx_pl']: scene_idx, ops['is_training_pl']: True}
 
         step, summary, _, loss_val, dir_loss, bin_ce_loss, \
-        offset_loss, approach_loss, adds_loss, adds_gt2pred_loss, scene_idx, _, _ = sess.run([ops['step'], summary_ops['merged'], ops['train_op'], ops['loss'], ops['dir_loss'],
+        offset_loss, approach_loss, adds_loss, adds_gt2pred_loss, scene_idx, _, _, _ = sess.run([ops['step'], summary_ops['merged'], ops['train_op'], ops['loss'], ops['dir_loss'],
                                                                                         ops['bin_ce_loss'], ops['offset_loss'], ops['approach_loss'], ops['adds_loss'], 
                                                                                         ops['adds_gt2pred_loss'], ops['scene_idx'],
                                                                                                   ops['print_op'], ops['print_op2'], ops['print_op3']], feed_dict=feed_dict)
