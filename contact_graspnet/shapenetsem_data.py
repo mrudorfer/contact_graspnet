@@ -113,6 +113,9 @@ def center_pc_convert_cam(cam_poses, batch_data):
     :param batch_data: (bxNx3) point clouds
     :returns: (cam_poses, batch_data) converted
     """
+    # okay, let's don't do anything right here. it's a mess...
+    return cam_poses, batch_data
+
     # OpenCV OpenGL conversion
     for j in range(len(cam_poses)):
         cam_poses[j, :3, 1] = -cam_poses[j, :3, 1]
@@ -157,8 +160,9 @@ class PointCloudReader:
         dataset_folder {str} -- ShapeNetSem-8 root folder
         batch_size {int} -- number of rendered point clouds per-batch (1)
         split {str} -- 'train' or 'test'
+        in_world_coords {bool} -- if true, point clouds are transformed in world coordinates, else in cam coords
     """
-    def __init__(self, dataset_folder, batch_size=1, split='train', n_points=None):
+    def __init__(self, dataset_folder, batch_size=1, split='train', n_points=None, in_world_coords=False):
         assert split == 'test' or split == 'train', f'unknown split {split}'
         assert batch_size == 1
 
@@ -170,6 +174,7 @@ class PointCloudReader:
         self.batch_size = batch_size
         self.split = split
         self.n_points = n_points
+        self.in_world_coords = in_world_coords
         self.images_dir = os.path.join(dataset_folder, 'images')
 
     def get_scene_batch(self, scene_idx=None, return_segmap=False, save=False, view=None):
@@ -209,9 +214,12 @@ class PointCloudReader:
         # pc = self.prune_and_normalize(pc)  # perhaps don't mess with the scale, as this might be done in CGN?
         # also we are in cam coordinates now, so the pruning and normalisation might not be meaningful
 
-        cam_pos, cam_quat = camera_pose[0], camera_pose[1]
-        cam_pose = tra.quaternion_matrix(cam_quat)
-        cam_pose[0:3, 3] = cam_pos
+        if self.in_world_coords:
+            cam_pose = np.eye(4)
+        else:
+            cam_pos, cam_quat = camera_pose[0], camera_pose[1]
+            cam_pose = tra.quaternion_matrix(cam_quat)
+            cam_pose[0:3, 3] = cam_pos
         cam_poses = cam_pose[None, :]  # add dim for batch size  # todo: openCV or OpenGL cam pose??
         # currently our z-axis is pointing away from the origin/scene, y-axis upwards
         batch_data = pc[None, :]  # add dim for batch size
@@ -255,29 +263,50 @@ class PointCloudReader:
         org_size = depth.shape
         depth = cv2.resize(depth, (224, 224), interpolation=cv2.INTER_NEAREST)
 
-        # convert it to point cloud and remove inf/nan points
-        # this is a very memory-intensive hack to remove the ground plane but retrieve the pc in cam coordinates
-        cam_pc = self.Depth2PointCloud(depth, intrinsic, org_size=org_size).transpose()
-        pc = self.Depth2PointCloud(depth, intrinsic, ca_ori, ca_loc, org_size=org_size).transpose()
+        # convert it to point cloud and remove inf/nan points, remove plane, crop, ...
+        if self.in_world_coords:
+            pc = self.Depth2PointCloud(depth, intrinsic, ca_ori, ca_loc, org_size=org_size).transpose()
+            # remove the undefined and outlier points
+            inf_idx = (pc != pc) | (np.abs(pc) > 100)
+            pc[inf_idx] = 0.0
 
-        # remove the undefined and outlier points
-        inf_idx = (pc != pc) | (np.abs(pc) > 100)
-        cam_pc[inf_idx] = 0.0
+            # need to prune the shelf --> remove all points below a certain threshold on the z axis
+            above_shelf_indexes = np.nonzero(pc[:, 2] > shelf_th)[0]
+            pc = pc[above_shelf_indexes]
 
-        # need to prune the shelf --> remove all points below a certain threshold on the z axis
-        above_shelf_indexes = np.nonzero(pc[:, 2] > shelf_th)[0]
-        cam_pc = cam_pc[above_shelf_indexes]
-        pc = pc[above_shelf_indexes]
+            # also prune everything that is not roughly within a bounding box (as plane removal fails for far away pts)
+            tensor_x = pc[:, 0]
+            tensor_y = pc[:, 1]
+            tensor_z = pc[:, 2]
+            del_idx = (tensor_x < -0.22 / 2) | (tensor_x > 0.22 / 2) | (tensor_y < -0.22 / 2) | (
+                        tensor_y > 0.22 / 2) | (
+                              tensor_z > 0.22)
+            pc = pc[del_idx == False]
 
-        # also prune everything that is not roughly within a bounding box (as plane removal fails for far away pts)
-        tensor_x = pc[:, 0]
-        tensor_y = pc[:, 1]
-        tensor_z = pc[:, 2]
-        del_idx = (tensor_x < -0.22 / 2) | (tensor_x > 0.22 / 2) | (tensor_y < -0.22 / 2) | (tensor_y > 0.22 / 2) | (
-                tensor_z > 0.22)
-        cam_pc = cam_pc[del_idx == False]
+            return pc
+        else:
+            # this is a very memory-intensive hack to remove the ground plane but retrieve the pc in cam coordinates
+            cam_pc = self.Depth2PointCloud(depth, intrinsic, org_size=org_size).transpose()
+            pc = self.Depth2PointCloud(depth, intrinsic, ca_ori, ca_loc, org_size=org_size).transpose()
 
-        return cam_pc
+            # remove the undefined and outlier points
+            inf_idx = (pc != pc) | (np.abs(pc) > 100)
+            cam_pc[inf_idx] = 0.0
+
+            # need to prune the shelf --> remove all points below a certain threshold on the z axis
+            above_shelf_indexes = np.nonzero(pc[:, 2] > shelf_th)[0]
+            cam_pc = cam_pc[above_shelf_indexes]
+            pc = pc[above_shelf_indexes]
+
+            # also prune everything that is not roughly within a bounding box (as plane removal fails for far away pts)
+            tensor_x = pc[:, 0]
+            tensor_y = pc[:, 1]
+            tensor_z = pc[:, 2]
+            del_idx = (tensor_x < -0.22 / 2) | (tensor_x > 0.22 / 2) | (tensor_y < -0.22 / 2) | (tensor_y > 0.22 / 2) | (
+                    tensor_z > 0.22)
+            cam_pc = cam_pc[del_idx == False]
+
+            return cam_pc
 
     def Depth2PointCloud(self, dmap, K, orientation=None, position=None, mask=None, org_size=None):
         '''

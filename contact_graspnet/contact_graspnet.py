@@ -410,6 +410,8 @@ def compute_labels(pos_contact_pts_mesh, pos_contact_dirs_mesh, pos_contact_appr
     # this should be true for the annotated contact points as well at least roughly
     print_op = tf.print('pc_mean', tf.reduce_mean(pc_mesh, axis=1), 'gt_mean', tf.reduce_mean(pos_contact_pts_mesh, axis=0),
                         'xzy_cam_mean', tf.reduce_mean(xyz_cam, axis=1))
+    # xyz_cam has more or less mean zero
+    # the pc_mesh however (which should be the transformed point cloud in world coordinates) is far off
 
     contact_point_offsets_batch = tf.keras.backend.repeat_elements(tf.expand_dims(pos_finger_diffs,0), pc_mesh.shape[0], axis=0)
 

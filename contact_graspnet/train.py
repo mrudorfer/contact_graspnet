@@ -46,6 +46,7 @@ def train(global_config, log_dir):
         batch_size=global_config['OPTIMIZER']['batch_size'],
         split='train',
         n_points=None,  # i.e. all point clouds will be given in original, varying size
+        in_world_coords=True,
     )
 
     with tf.Graph().as_default():
