@@ -405,6 +405,11 @@ def compute_labels(pos_contact_pts_mesh, pos_contact_dirs_mesh, pos_contact_appr
     pad_homog = tf.ones((xyz_cam.shape[0],xyz_cam.shape[1], 1)) 
     pc_mesh = tf.matmul(tf.concat([xyz_cam, pad_homog], 2), tf.transpose(tf.linalg.inv(camera_pose_pl),perm=[0, 2, 1]))[:,:,:3]
 
+    # how to check that the transforms are correct?
+    # transformed pc_cam should be in world coordinates, i.e. points should average at x/y=0 and z=sth
+    # this should be true for the annotated contact points as well at least roughly
+    print_op = tf.print('pc_mean', tf.reduce_mean(pc_mesh, axis=1), 'gt_mean', tf.reduce_mean(pos_contact_pts_mesh, axis=0))
+
     contact_point_offsets_batch = tf.keras.backend.repeat_elements(tf.expand_dims(pos_finger_diffs,0), pc_mesh.shape[0], axis=0)
 
     pad_homog2 = tf.ones((pc_mesh.shape[0], pos_contact_dirs_mesh.shape[0], 1)) 
@@ -436,5 +441,5 @@ def compute_labels(pos_contact_pts_mesh, pos_contact_dirs_mesh, pos_contact_appr
     approach_labels_pc_cam = tf.math.l2_normalize(tf.reduce_mean(grouped_approaches_pc_cam, axis=2),axis=2) # (batch_size, num_point, 3)
     offset_labels_pc = tf.reduce_mean(grouped_offsets, axis=2)
         
-    return dir_labels_pc_cam, offset_labels_pc, grasp_success_labels_pc, approach_labels_pc_cam
+    return dir_labels_pc_cam, offset_labels_pc, grasp_success_labels_pc, approach_labels_pc_cam, print_op
 

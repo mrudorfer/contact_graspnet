@@ -121,7 +121,7 @@ def train_one_epoch(sess, ops, summary_ops, file_writers, pcreader):
         offset_loss, approach_loss, adds_loss, adds_gt2pred_loss, scene_idx, _, _ = sess.run([ops['step'], summary_ops['merged'], ops['train_op'], ops['loss'], ops['dir_loss'],
                                                                                         ops['bin_ce_loss'], ops['offset_loss'], ops['approach_loss'], ops['adds_loss'], 
                                                                                         ops['adds_gt2pred_loss'], ops['scene_idx'],
-                                                                                                  ops['print_op'], ops['print_op2']], feed_dict=feed_dict)
+                                                                                                  ops['print_op'], ops['print_op2'], ops['print_op3']], feed_dict=feed_dict)
         assert scene_idx[0] == scene_idx
         
         loss_log[batch_idx%10,:] = loss_val, dir_loss, bin_ce_loss, offset_loss, approach_loss, adds_loss, adds_gt2pred_loss
