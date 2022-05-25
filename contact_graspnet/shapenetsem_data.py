@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import trimesh.transformations as tra
 
-from .data import regularize_pc_point_count
+from data import regularize_pc_point_count
 
 
 def load_scene_contacts(dataset_folder, split='train', max_num_grasps=None):
