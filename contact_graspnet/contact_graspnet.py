@@ -352,6 +352,8 @@ def get_losses(pointclouds_pl, end_points, dir_labels_pc_cam, offset_labels_pc, 
         bin_ce_loss,_ = tf.math.top_k(tf.squeeze(bin_ce_loss), k=global_config['LOSS']['topk_confidence'])
     bin_ce_loss = tf.reduce_mean(bin_ce_loss)
 
+    print('raw losses: ', dir_cosine_loss, bin_ce_loss, offset_loss, approach_cosine_loss, adds_loss, adds_loss_gt2pred)
+
     return dir_cosine_loss, bin_ce_loss, offset_loss, approach_cosine_loss, adds_loss, adds_loss_gt2pred
 
 def multi_bin_labels(cont_labels, bin_boundaries):
