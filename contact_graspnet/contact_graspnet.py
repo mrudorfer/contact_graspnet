@@ -408,7 +408,8 @@ def compute_labels(pos_contact_pts_mesh, pos_contact_dirs_mesh, pos_contact_appr
     # how to check that the transforms are correct?
     # transformed pc_cam should be in world coordinates, i.e. points should average at x/y=0 and z=sth
     # this should be true for the annotated contact points as well at least roughly
-    print_op = tf.print('pc_mean', tf.reduce_mean(pc_mesh, axis=1), 'gt_mean', tf.reduce_mean(pos_contact_pts_mesh, axis=0))
+    print_op = tf.print('pc_mean', tf.reduce_mean(pc_mesh, axis=1), 'gt_mean', tf.reduce_mean(pos_contact_pts_mesh, axis=0),
+                        'xzy_cam_mean', tf.reduce_mean(xyz_cam, axis=1))
 
     contact_point_offsets_batch = tf.keras.backend.repeat_elements(tf.expand_dims(pos_finger_diffs,0), pc_mesh.shape[0], axis=0)
 
