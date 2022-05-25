@@ -70,12 +70,12 @@ def preprocess_pc_for_inference(input_pc, num_point, pc_mean=None, return_mean=F
     Returns:
         [np.ndarray] -- num_pointx3 preprocessed point cloud
     """
-    normalize_pc_count = input_pc.shape[0] != num_point
-    if normalize_pc_count:
-        pc = regularize_pc_point_count(input_pc, num_point, use_farthest_point=use_farthest_point).copy()
-    else:
-        pc = input_pc.copy()
-    
+    # normalize_pc_count = input_pc.shape[0] != num_point
+    # if normalize_pc_count:
+    #     pc = regularize_pc_point_count(input_pc, num_point, use_farthest_point=use_farthest_point).copy()
+    # else:
+    #     pc = input_pc.copy()
+    pc = input_pc.copy()
     if convert_to_internal_coords:
         pc[:,:2] *= -1
 
@@ -197,6 +197,8 @@ def regularize_pc_point_count(pc, npoints, use_farthest_point=False):
       :param use_farthest_point: use farthest point sampling to downsample the points, runs slower.
       :returns: npointsx3 regularized point cloud
     """
+    if npoints is None:
+        return pc
     
     if pc.shape[0] > npoints:
         if use_farthest_point:
