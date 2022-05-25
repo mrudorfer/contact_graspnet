@@ -1,4 +1,4 @@
-
+import sys
 import numpy as np
 import tensorflow.compat.v1 as tf
 tf.disable_eager_execution()
@@ -107,7 +107,7 @@ def load_labels_and_losses(grasp_estimator, contact_infos, global_config, train=
     dir_labels_pc_cam, offset_labels_pc, \
     grasp_suc_labels_pc, approach_labels_pc = grasp_estimator._model_func.compute_labels(tf_pos_contact_points_idx[idx], tf_pos_contact_dirs_idx[idx], tf_pos_contact_approaches_idx[idx], 
                                                                                             tf_pos_finger_diffs_idx[idx], target_point_cloud, cam_poses_pl, global_config)
-
+    print_op2 = tf.print('grasp success labels', tf.shape(grasp_suc_labels_pc), tf.mean(grasp_suc_labels_pc), output_stream=sys.stdout)
     
     if global_config['MODEL']['bin_offsets']:
         orig_offset_labels = offset_labels_pc
@@ -154,6 +154,7 @@ def load_labels_and_losses(grasp_estimator, contact_infos, global_config, train=
                       'scene_idx': tf_scene_idcs,
                       'iterator': iterator,
                       'print_op': print_op,
+                      'print_op2': print_op2,
         }
 
     return loss_label_ops
