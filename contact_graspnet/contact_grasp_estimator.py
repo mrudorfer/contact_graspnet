@@ -36,6 +36,7 @@ class GraspEstimator:
         self._model_func = importlib.import_module(self._contact_grasp_cfg['MODEL']['model'])
         # self._num_input_points = self._contact_grasp_cfg['DATA']['raw_num_points'] if 'raw_num_points' in self._contact_grasp_cfg['DATA'] else self._contact_grasp_cfg['DATA']['num_point']
         self._num_input_points = None  # allow flexible size of point clouds (requires batch size 1)
+        self._num_input_points = self._contact_grasp_cfg['DATA']['raw_num_points']  # allow flexible size of point clouds (requires batch size 1)
 
         self.placeholders = self._model_func.placeholder_inputs(self._contact_grasp_cfg['OPTIMIZER']['batch_size'],
                                                                 self._num_input_points, 
@@ -191,6 +192,7 @@ class GraspEstimator:
 
         # Run model inference
         pred_grasps_cam, pred_scores, pred_points, offset_pred = sess.run(self.inference_ops, feed_dict=feed_dict)
+        print(f'inference done, pred_scores ({pred_scores.shape}) between {np.min(pred_scores)} and {np.max(pred_scores)}')
 
         pred_grasps_cam = pred_grasps_cam.reshape(-1, *pred_grasps_cam.shape[-2:])
         pred_points = pred_points.reshape(-1, pred_points.shape[-1])
@@ -215,6 +217,10 @@ class GraspEstimator:
                                             self._contact_grasp_cfg['TEST']['second_thres'] if 'second_thres' in self._contact_grasp_cfg['TEST'] else self._contact_grasp_cfg['TEST']['first_thres'], 
                                             with_replacement=self._contact_grasp_cfg['TEST']['with_replacement'])
 
+        ## instead just select some random ones!!
+        selection_idcs = np.random.choice(2048, 100, replace=False)
+
+        print('after filtering, selection_idcs:', selection_idcs.shape)
         if not np.any(selection_idcs):
             selection_idcs=np.array([], dtype=np.int32)
 
@@ -246,41 +252,11 @@ class GraspEstimator:
             [np.ndarray, np.ndarray, np.ndarray, np.ndarray] -- pred_grasps_cam, scores, contact_pts, gripper_openings
         """
 
-        pred_grasps_cam, scores, contact_pts, gripper_openings = {}, {}, {}, {}
-
-        # Predict grasps in local regions or full pc
-        if local_regions:
-            pc_regions, _ = self.extract_3d_cam_boxes(pc_full, pc_segments)
-            for k, pc_region in pc_regions.items():
-                pred_grasps_cam[k], scores[k], contact_pts[k], gripper_openings[k] = self.predict_grasps(sess, pc_region, convert_cam_coords=True, forward_passes=forward_passes)
-        else:
-            pc_full = regularize_pc_point_count(pc_full, self._contact_grasp_cfg['DATA']['raw_num_points'])
-            pred_grasps_cam[-1], scores[-1], contact_pts[-1], gripper_openings[-1] = self.predict_grasps(sess, pc_full, convert_cam_coords=True, forward_passes=forward_passes)
-            print('Generated {} grasps'.format(len(pred_grasps_cam[-1])))
-
-        # Filter grasp contacts to lie within object segment
-        if filter_grasps:
-            segment_keys = contact_pts.keys() if local_regions else pc_segments.keys()
-            for k in segment_keys:
-                j = k if local_regions else -1
-                if np.any(pc_segments[k]) and np.any(contact_pts[j]):
-                    segment_idcs = self.filter_segment(contact_pts[j], pc_segments[k], thres=self._contact_grasp_cfg['TEST']['filter_thres'])
-
-                    pred_grasps_cam[k] = pred_grasps_cam[j][segment_idcs]
-                    scores[k] = scores[j][segment_idcs]
-                    contact_pts[k] = contact_pts[j][segment_idcs]
-                    try:
-                        gripper_openings[k] = gripper_openings[j][segment_idcs]
-                    except:
-                        print('skipped gripper openings {}'.format(gripper_openings[j]))
-
-                    if local_regions and np.any(pred_grasps_cam[k]):
-                        print('Generated {} grasps for object {}'.format(len(pred_grasps_cam[k]), k))
-                else:
-                    print('skipping obj {} since  np.any(pc_segments[k]) {} and np.any(contact_pts[j]) is {}'.format(k, np.any(pc_segments[k]), np.any(contact_pts[j])))
-
-            if not local_regions:
-                del pred_grasps_cam[-1], scores[-1], contact_pts[-1], gripper_openings[-1]
+        # pc_full = regularize_pc_point_count(pc_full, self._contact_grasp_cfg['DATA']['raw_num_points'])
+        # note: we did not do this at training time either, i believe.
+        print(f'pc_full: {pc_full.shape}')
+        pred_grasps_cam, scores, contact_pts, gripper_openings = self.predict_grasps(sess, pc_full, convert_cam_coords=True, forward_passes=forward_passes)
+        print('Generated {} grasps'.format(pred_grasps_cam.shape))
 
         return pred_grasps_cam, scores, contact_pts, gripper_openings
     
