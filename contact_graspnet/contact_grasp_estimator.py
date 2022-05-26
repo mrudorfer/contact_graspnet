@@ -182,6 +182,8 @@ class GraspEstimator:
 
         if len(pc.shape) == 2:
             pc_batch = pc[np.newaxis,:,:]
+        else:
+            pc_batch = pc
 
         if forward_passes > 1:
             pc_batch = np.tile(pc_batch, (forward_passes,1,1))

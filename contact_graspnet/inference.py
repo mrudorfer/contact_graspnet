@@ -5,6 +5,7 @@ import numpy as np
 import time
 import glob
 import cv2
+from scipy.spatial.transform import Rotation as scipy_rot
 
 import tensorflow.compat.v1 as tf
 tf.disable_eager_execution()
@@ -14,7 +15,7 @@ tf.config.experimental.set_memory_growth(physical_devices[0], True)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.join(BASE_DIR))
 import config_utils
-from shapenetsem_data import PointCloudReader, load_scene_contacts, center_pc_convert_cam
+from shapenetsem_data import PointCloudReader, transform_grasps_hand_to_TCP, make_canonical_orientation
 
 from contact_grasp_estimator import GraspEstimator
 from visualization_utils import visualize_grasps, show_image
@@ -39,7 +40,8 @@ def inference(global_config, checkpoint_dir, input_paths, K=None, local_regions=
         dataset_folder=global_config['DATA']['data_path'],
         batch_size=1,
         split='test',
-        max_points=global_config['DATA']['raw_num_points']
+        n_points=None,
+        in_world_coords=True
     )
     num_test_samples = len(pcreader.shapes)
 
@@ -60,26 +62,44 @@ def inference(global_config, checkpoint_dir, input_paths, K=None, local_regions=
     grasp_estimator.load_weights(sess, saver, checkpoint_dir, mode='test')
     
     os.makedirs('results', exist_ok=True)
+    result_dir = 'results/epoch500'
+    os.makedirs(result_dir, exist_ok=True)
 
     # Process example test scenes
-    for test_shape_idx in range(num_test_samples):
+    for test_shape_idx in [0]:  # range(num_test_samples):
         shape = pcreader.shapes[test_shape_idx]
-        pc, cam_pose, _ = pcreader.get_scene_batch(test_shape_idx, view=0)
-        print(f'loaded test shape {shape} with pc {pc.shape}')
+        for view in [0]:
+            view_dir = os.path.join(result_dir, f'view{view}')
+            os.makedirs(view_dir, exist_ok=True)
 
-        print('Generating Grasps...')
-        pred_grasps_cam, scores, contact_pts, _ = \
-            grasp_estimator.predict_scene_grasps(sess, pc, pc_segments={}, local_regions=local_regions,
-                                                 filter_grasps=filter_grasps, forward_passes=forward_passes)
+            pc, _, _ = pcreader.get_scene_batch(test_shape_idx, view=view)
+            print(f'loaded test shape {shape} view {view} with pc {pc.shape}')
 
-        # Save results
-        # todo make same directory structure as in GPNet
-        # todo grasps are in cam_pose and in panda_hand - transform accordingly
-        np.savez('results/predictions_{}.npz'.format(shape), pred_grasps_cam=pred_grasps_cam, scores=scores,
-                 contact_pts=contact_pts, pc_cam=pc.squeeze())
+            print('Generating Grasps...')
+            pred_grasps_cam, scores, contact_pts, _ = \
+                grasp_estimator.predict_scene_grasps(sess, pc, pc_segments={}, local_regions=local_regions,
+                                                     filter_grasps=filter_grasps, forward_passes=forward_passes)
 
-        # Visualize results
-        # visualize_grasps(pc, pred_grasps_cam, scores, plot_opencv_cam=True)
+            # convert grasps correspondingly
+            # pred_grasps_TCP = transform_grasps_hand_to_TCP(pred_grasps_cam)  # transform from panda_hand to TCP
+            # pred_grasps = make_canonical_orientation(pred_grasps_TCP)
+            pred_grasps = pred_grasps_cam
+
+            # for direct inspection
+            np.savez('results/predictions_{}_v{}2.npz'.format(shape, view), pred_grasps=pred_grasps, scores=scores,
+                     contact_pts=contact_pts, pc_cam=pc.squeeze())
+
+            all_grasps_path = os.path.join(view_dir, shape + '.npz')
+            rots = scipy_rot.from_matrix(pred_grasps[:, 0:3, 0:3])
+            quats = rots.as_quat()  # x, y, z, w
+            quats = quats[:, [3, 0, 1, 2]]  # wxyz
+
+            centers = pred_grasps[:, 0:3, 3]
+            widths = np.zeros(shape=(len(pred_grasps)))
+            np.savez(all_grasps_path, widths=widths, centers=centers, quaternions=quats, scores=scores)
+
+            # Visualize results
+            # visualize_grasps(pc, pred_grasps_cam, scores, plot_opencv_cam=True)
 
 
 if __name__ == "__main__":

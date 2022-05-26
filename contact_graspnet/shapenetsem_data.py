@@ -79,11 +79,18 @@ def matrix_from_pos_quat(grasp_centers, quaternions):
     return grasps
 
 
-def transform_grasps_hand_to_TCP(grasps, canonical_orientation=False):
-    """ grasps: (n, 4, 4) """
-    if canonical_orientation:
-        raise NotImplementedError('need to implement this for rule-based evaluation')
+def make_canonical_orientation(grasps):
+    # if the grasp's x-axis is pointing downwards, then we flip x and y
+    need_to_flip = grasps[:, 2, 0] < 0
+    factor = np.ones(len(need_to_flip)) - 2 * need_to_flip  # -1 where need to flip is true
+    factor = np.repeat(factor[:, None], 3, axis=1)
+    grasps[:, 0:3, 0] *= factor
+    grasps[:, 0:3, 1] *= factor
+    return grasps
 
+
+def transform_grasps_hand_to_TCP(grasps):
+    """ grasps: (n, 4, 4) """
     # transform from their gripper coordinate system https://github.com/NVlabs/6dof-graspnet/issues/8 to our
     # tool-center-point oriented system:
     #   1. apply offset in z axis of 10.3cm
@@ -406,7 +413,22 @@ class PointCloudReader:
 
 
 if __name__ == '__main__':
+    # test flipping grasps
+    from scipy.spatial.transform import Rotation
     import burg_toolkit as burg
+
+    rots = Rotation.random(10)
+    pos = np.random.random(size=(10, 3))
+    some_grasps = np.zeros(shape=(10, 4, 4))
+    some_grasps[:, 0:3, 0:3] = rots.as_matrix()
+    some_grasps[:, 0:3, 3] = pos
+    some_grasps[:, 3, 3] = 1
+
+    burg.visualization.show_grasp_set([], gs=burg.GraspSet.from_poses(some_grasps))
+    new_grasps = make_canonical_orientation(some_grasps)
+    burg.visualization.show_grasp_set([], gs=burg.GraspSet.from_poses(new_grasps))
+    exit()
+
     dataset_dir = '/home/martin/datasets/ShapeNetSem-8/'
     split = 'test'
     # contacts = load_scene_contacts(dataset_dir, split=split)

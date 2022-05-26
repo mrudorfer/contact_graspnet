@@ -79,10 +79,14 @@ def preprocess_pc_for_inference(input_pc, num_point, pc_mean=None, return_mean=F
     if convert_to_internal_coords:
         pc[:,:2] *= -1
 
-    if pc_mean is None:
-        pc_mean = np.mean(pc, 0)
+    # todo: skip mean for now, point clouds are reasonably centered in world coordinates anyway
+    pc_mean = np.zeros(3)
 
-    pc -= np.expand_dims(pc_mean, 0)
+    # if pc_mean is None:1
+    #     pc_mean = np.mean(pc, 0)
+    #
+    # pc -= np.expand_dims(pc_mean, 0)
+
     if return_mean:
         return pc, pc_mean
     else:
