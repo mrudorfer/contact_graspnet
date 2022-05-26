@@ -81,9 +81,9 @@ def inference(global_config, checkpoint_dir, input_paths, K=None, local_regions=
                                                      filter_grasps=filter_grasps, forward_passes=forward_passes)
 
             # convert grasps correspondingly
-            # pred_grasps_TCP = transform_grasps_hand_to_TCP(pred_grasps_cam)  # transform from panda_hand to TCP
-            # pred_grasps = make_canonical_orientation(pred_grasps_TCP)
-            pred_grasps = pred_grasps_cam
+            pred_grasps_TCP = transform_grasps_hand_to_TCP(pred_grasps_cam)  # transform from panda_hand to TCP
+            pred_grasps = make_canonical_orientation(pred_grasps_TCP)
+            # pred_grasps = pred_grasps_cam
 
             # for direct inspection
             np.savez('results/predictions_{}_v{}2.npz'.format(shape, view), pred_grasps=pred_grasps, scores=scores,
