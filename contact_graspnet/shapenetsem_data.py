@@ -10,7 +10,7 @@ import trimesh.transformations as tra
 from data import regularize_pc_point_count
 
 
-def load_scene_contacts(dataset_folder, split='train', max_num_grasps=None):
+def load_scene_contacts(dataset_folder, split='train', max_num_grasps=None, unique_angle=False):
     """
     Load contact grasp annotations from acronym scenes
 
@@ -20,6 +20,7 @@ def load_scene_contacts(dataset_folder, split='train', max_num_grasps=None):
     Keyword Arguments:
         split {str} -- 'train' or 'test'
         max_num_grasps {int} -- maximum number of grasp annotations to load
+        unique_angle {bool} -- if True, will not give different angles for the same contact point pair
 
     Returns:
         list(dicts) -- list of scene annotations dicts with object paths and transforms and grasp contacts and transforms.
@@ -53,6 +54,19 @@ def load_scene_contacts(dataset_folder, split='train', max_num_grasps=None):
         contact_points = contact_points[sim_result]
         grasp_centers = grasp_centers[sim_result]
         quaternions = quaternions[sim_result]
+
+        if unique_angle:
+            # let's first shuffle the grasp annotations
+            # then pick the unique ones (if we don't shuffle, we might have the same angle all over)
+            idcs = np.arange(len(grasp_centers))
+            np.random.shuffle(idcs)
+            contact_points = contact_points[idcs]
+            grasp_centers = grasp_centers[idcs]
+            quaternions = quaternions[idcs]
+
+            contact_points, idcs = np.unique(contact_points, return_index=True, axis=0)
+            grasp_centers = grasp_centers[idcs]
+            quaternions = quaternions[idcs]
 
         if max_num_grasps is not None and grasp_centers.shape[0] > max_num_grasps:
             idcs = np.random.choice(grasp_centers.shape[0], max_num_grasps, replace=False)

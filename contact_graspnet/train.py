@@ -36,7 +36,8 @@ def train(global_config, log_dir):
         log_dir {str} -- Checkpoint directory
     """
 
-    contact_infos = load_scene_contacts(global_config['DATA']['data_path'], split='train', max_num_grasps=None)
+    contact_infos = load_scene_contacts(global_config['DATA']['data_path'], split='train', max_num_grasps=None,
+                                        unique_angle=True)
     
     num_train_samples = len(contact_infos)
     print('using %s meshes' % num_train_samples)
